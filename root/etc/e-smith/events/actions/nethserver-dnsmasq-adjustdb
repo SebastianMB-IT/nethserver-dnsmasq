@@ -23,16 +23,31 @@
 use strict;
 use esmith::ConfigDB;
 use esmith::NetworksDB;
-my $ndb = esmith::NetworksDB->open_ro();
-my $cdb = esmith::ConfigDB->open('dhcp');
+my $ndb = esmith::NetworksDB->open_ro() || die("Couldn't open NetworksDB");
+my $cdb = esmith::ConfigDB->open('dhcp') || die("Couldn't open dhcp DB");
 
 my $event = shift;
 
 foreach ($cdb->get_all_by_prop('type' => 'range')) {
     my $interface = $ndb->get($_->key);
-    if ( ! defined($interface) || $interface->prop('role') !~ m/^(green|blue)$/) {
-        # Delete ranges associated to non-existing blue or green interface
+    if (!defined($interface)) {
+        # Delete ranges associated to non-existing interface
+        $_->delete();
+    } elsif($interface->prop('role') eq 'bridged') {
+        rename_range($_, $interface->prop('bridge'));
+    } elsif($interface->prop('role') eq 'slave') {
+        rename_range($_, $interface->prop('master'));
+    } elsif($interface->prop('role') !~ m/^(green|blue)$/) {
+        # Delete ranges associated to other roles (except green and blue):
         $_->delete();
     }
+}
+
+sub rename_range($range_record, $new_key)
+{
+    my $old_key = $range_record->key;
+    warn "[NOTICE] Rename dhcp record: $old_key -> $new_key\n";
+    $cdb->new_record($new_key, {$range_record->props()});
+    $range_record->delete();
 }
 
