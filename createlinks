@@ -100,3 +100,6 @@ event_actions('interface-update', qw(
 $event = "migration-import";
 event_actions($event, 'nethserver-dnsmasq-migrate' => 60);
 
+validator_actions('logical-interface-create', qw(
+    dhcp-conflicts 20
+));
